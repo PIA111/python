@@ -1,5 +1,5 @@
 ---
-title: "The research of deoendancy between education level and employee's loyalty"
+title: "The research on dependancy between education level and employee's loyalty"
 author: "Ilya Pavlov"
 output: pdf_document
 header-includes:
