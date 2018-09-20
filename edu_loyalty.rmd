@@ -1,0 +1,165 @@
+---
+title: "The research of deoendancy between education level and employee's loyalty"
+author: "Ilya Pavlov"
+output: pdf_document
+header-includes:
+   - \usepackage[russian]{babel}
+---
+
+I choose dependent variable Loyalty which represents mean of answers on questions 1, 2, 3 and mean of answer on reversed questions 18, 19, 20
+
+```{r}
+ocb_att<-read.csv("ocb_attr.csv",header=TRUE,sep=";")
+```
+
+
+```{r}
+q18_rev<-ifelse(ocb_att$Q18==0,1,0)
+q19_rev<-ifelse(ocb_att$Q19==0,1,0)
+q20_rev<-ifelse(ocb_att$Q20==0,1,0)
+```
+
+```{r}
+loyalty<-rowMeans(cbind(ocb_att$Q1,ocb_att$Q2,ocb_att$Q2,q18_rev, q19_rev, q20_rev),na.rm=TRUE)
+```
+
+I select SupportNet as I hypothesize that if employee support their colleagues it could impact positively on his or her loyalty to the firm.
+```{r}
+SupportNet<-read.csv("SupportNet.csv",header=TRUE,sep=";")
+```
+
+```{r}
+support_mat<-as.matrix(SupportNet)
+```
+
+```{r}
+library(network)
+library(sna)
+```
+
+```{r}
+support_network<-as.network(support_mat, directed=TRUE)
+geo.dist<-geodist(support_network)
+indegree <- degree(support_network, gmode = 'digraph',
+diag = FALSE, cmode = 'indegree',
+rescale = FALSE, ignore.eval = FALSE)
+outdegree <- degree(support_network, gmode = 'digraph',
+diag = FALSE, cmode = 'outdegree',
+rescale = FALSE, ignore.eval = FALSE)
+degree.f <- degree(support_network, gmode = 'digraph',
+diag = FALSE, cmode = 'freeman',
+rescale = FALSE, ignore.eval = FALSE)
+between <- betweenness(support_network, gmode = 'digraph',
+diag = FALSE, cmode = 'directed')
+close <- closeness(support_network, gmode = 'digraph',
+diag = FALSE, cmode = 'directed', rescale = FALSE)
+eigen <- evcent(support_network, gmode = 'digraph',
+diag = FALSE, rescale = FALSE)
+```
+
+```{r}
+detach(package:sna)
+detach(package:network)
+library(igraph)
+```
+
+```{r}
+all_graph<-graph_from_adjacency_matrix(support_mat)
+```
+
+```{r}
+names<-ocb_att$Name
+sex<-ocb_att$Sex
+age<-ocb_att$Age
+tenure<-ocb_att$WorkTitleYear+ocb_att$WorkTitleMonth/12
+tenure_org<-ocb_att$WorkOrgYear+ocb_att$WorkOrgMonth/12
+tenure_sup<-ocb_att$RepSupYear+ocb_att$RepSupMonth/12
+ed1<-ifelse(ocb_att$Education==3,1,0) 
+ed2<-ifelse(ocb_att$Education==4,1,0)
+gender_vector<-vector() 
+for(i in 1:122){ 
+for(j in 1:68){
+if(V(all_graph)$name[i]==names[j]){
+gender_vector[i]<-sex[j]
+break;}
+else{gender_vector[i]<-NA}
+}
+}
+gender_vector
+```
+
+```{r}
+all_graph<-set_vertex_attr(all_graph, 'gender', value=c(gender_vector))
+colors<-ifelse(gender_vector==1,"palevioletred",
+ifelse(gender_vector==0,"blueviolet","gray"))
+par(mar=c(0,0,1,0))
+plot(all_graph, vertex.size=6.5, vertex.color=colors,
+edge.arrow.size=.2, edge.color="black",
+vertex.label=NA, main="Meaningless Network of SupportNet")
+```
+
+```{r}
+v_geodist<-vector()
+v_indegree<-vector()
+v_outdegree<-vector()
+v_degree.f<-vector()
+v_between<-vector()
+v_close<-vector()
+v_eigen<-vector()
+for(i in 1:122){
+for(j in 1:68){
+if(V(all_graph)$name[i]==names[j]){
+v_geodist[j]<-geo.dist[i]
+v_indegree[j]<-indegree[i]
+v_outdegree[j]<-outdegree[i]
+v_degree.f[j]<-degree.f[i]
+v_between[j]<-between[i]
+v_close[j]<-close[i]
+v_eigen[j]<-eigen[i]
+break;}
+else{}
+}
+}
+```
+
+```{r}
+cor_mat<-cbind(loyalty,sex,age,tenure,tenure_sup,tenure_org,v_indegree,v_outdegree)
+cor(cor_mat)
+```
+
+We can see that variable 'tenure' highly correlates with variables 'tenure_sup' and 'tenure_org'. Let's delete it from our modelling.
+
+```{r}
+cor_mat<-cbind(loyalty,sex,age,tenure_sup,tenure_org,v_indegree,v_outdegree)
+cor(cor_mat)
+```
+
+Also let's hide tenure_org strongly correlated with one of our most hopeful predictors tenure_sup.
+
+```{r}
+cor_mat<-cbind(loyalty,sex,age,tenure_sup,v_indegree,v_outdegree)
+cor(cor_mat)
+```
+
+Now we do not have serious problems with strong correlation between predictors.
+
+```{r}
+##lmout<-lm(loyalty~sex+age+tenure_sup+v_indegree+v_outdegree)
+##summary(lmout)
+```
+
+We see that all our predictors have statistically insignificant impact on dependenet variable. Let's try to include variables 'ed1' and 'ed2' in modelling.
+
+```{r}
+##lmout<-lm(loyalty~sex+age+tenure_sup+ed1+ed2+v_indegree+v_outdegree)
+##summary(lmout)
+```
+
+Let's leave only statistically significant predictors in the model.
+
+```{r}
+lmout<-lm(loyalty~ed1+ed2)
+summary(lmout)
+```
+
+We can observe that having education marked 4 ('ed2') positively impact on employee's loyalty. And having education marked 3 ('ed1') also positively influence but no so high. Surely, we understand that these variables are strongly correlate with each other but only they could be statistically significant predictors of our dependent variable. R-squared of our model is rather small.
